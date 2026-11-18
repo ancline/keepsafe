@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KeepSafe dashboard</title>
+<style>
+:root{--bg:#eef1f4;--panel:#fff;--ink:#14213d;--mute:#5b6577;--line:#d5dbe3;--accent:#0f766e;
+--normal:#0f766e;--warning:#b45309;--alert:#c2410c;--critical:#b91c1c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Segoe UI",system-ui,sans-serif}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:16px;padding:14px 24px;background:var(--ink);color:#fff}
+header h1{font-size:20px;margin:0;font-weight:650;letter-spacing:.2px}
+nav{display:flex;gap:4px;margin-left:auto}
+nav button{background:none;border:0;color:#b8c2d6;padding:8px 14px;border-radius:6px;font:inherit;cursor:pointer}
+nav button.on,nav button:hover{background:#26365c;color:#fff}
+nav button:focus-visible,button:focus-visible,input:focus-visible{outline:2px solid #5eead4;outline-offset:2px}
+main{max-width:1100px;margin:24px auto;padding:0 20px}
+section{display:none}section.on{display:block}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px}
+.locker{border-left:8px solid var(--normal)}
+.locker.WARNING{border-left-color:var(--warning)}.locker.ALERT{border-left-color:var(--alert)}.locker.CRITICAL{border-left-color:var(--critical)}
+.locker.off{border-left-color:#9aa4b5;opacity:.75}
+.locker h2{margin:0 0 4px;font-size:18px}
+.big{font-size:28px;font-weight:700;margin:6px 0}
+.meta{color:var(--mute);font-size:13px}
+button.act{background:var(--accent);color:#fff;border:0;border-radius:6px;padding:8px 14px;font:inherit;cursor:pointer;margin-top:10px}
+button.act.sec{background:#fff;color:var(--ink);border:1px solid var(--line)}
+button.act.danger{background:#fff;color:var(--critical);border:1px solid var(--critical)}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);font-size:14px}
+th{background:#f6f8fa;font-weight:600}
+.wrap{overflow-x:auto}
+.tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:12px;color:#fff;background:var(--normal)}
+.tag.WARNING{background:var(--warning)}.tag.ALERT{background:var(--alert)}.tag.CRITICAL{background:var(--critical)}
+.bar{display:flex;align-items:flex-end;gap:4px;height:140px;margin-top:10px}
+.bar div{flex:1;background:var(--accent);min-height:2px;border-radius:3px 3px 0 0;position:relative}
+.bar.f div{background:var(--alert)}
+.lbls{display:flex;gap:4px;font-size:11px;color:var(--mute)}.lbls span{flex:1;text-align:center}
+.row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+input{padding:8px 10px;border:1px solid var(--line);border-radius:6px;font:inherit;background:#fff}
+a.act{display:inline-block;text-decoration:none}
+@media (max-width:600px){nav{margin-left:0;width:100%}}
+</style>
+</head>
+<body>
+<header>
+  <h1>KeepSafe</h1>
+  <nav id="nav">
+    <button data-t="lockers" class="on">Lockers</button>
+    <button data-t="activity">Activity</button>
+    <button data-t="users">Users</button>
+    <button data-t="charts">Charts</button>
+  </nav>
+</header>
+<main>
+  <section id="lockers" class="on"><div class="grid" id="lockerGrid"></div><p class="meta" id="noLockers"></p></section>
+
+  <section id="activity">
+    <div class="row">
+      <input id="q" placeholder="Search user, type, result" size="30">
+      <a class="act sec" id="csv" href="/api/export.csv"><button class="act sec" style="margin:0">Download CSV</button></a>
+    </div>
+    <div class="wrap"><table><thead><tr><th>Time</th><th>Locker</th><th>Event</th><th>User</th><th>Result</th><th>Detail</th><th>Level</th></tr></thead><tbody id="evBody"></tbody></table></div>
+  </section>
+
+  <section id="users">
+    <div class="card" style="margin-bottom:16px">
+      <div class="row">
+        <input id="uName" placeholder="Name">
+        <input id="uCard" placeholder="Card UID (e.g. A1B2C3D4)">
+        <input id="uPin" placeholder="PIN (4-8 digits)" inputmode="numeric" maxlength="8">
+        <label class="meta" style="align-self:center"><input type="checkbox" id="uAny"> Allowed at any hour</label>
+        <button class="act" id="addUser" style="margin:0">Add user</button>
+      </div>
+      <div class="meta">Read a new card's UID from the locker's event log: tap it once, then find the "not registered" entry in Activity.</div>
+    </div>
+    <div class="wrap"><table><thead><tr><th>Name</th><th>Card</th><th>PIN</th><th>Hours</th><th>Status</th><th></th></tr></thead><tbody id="uBody"></tbody></table></div>
+  </section>
+
+  <section id="charts">
+    <div class="grid">
+      <div class="card"><strong>Busiest hours (granted, last 7 days)</strong><div class="bar" id="hrBar"></div><div class="lbls" id="hrLbl"></div></div>
+      <div class="card"><strong>Failed attempts per day</strong><div class="bar f" id="dayBar"></div><div class="lbls" id="dayLbl"></div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const api = (u, o) => fetch(u, o).then(r => r.json());
+const post = (u, m, b) => api(u, {method: m, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b || {})});
+
+document.querySelectorAll('#nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#nav button,main section').forEach(e => e.classList.remove('on'));
+  b.classList.add('on'); $('#' + b.dataset.t).classList.add('on'); refresh();
+});
+
+async function loadLockers() {
+  const l = await api('/api/status');
+  $('#noLockers').textContent = l.length ? '' : 'No locker has connected yet. Check Wi-Fi and the server address in the firmware.';
+  $('#lockerGrid').innerHTML = l.map(x => {
+    const lv = x.online ? x.level : 'off';
+    const state = !x.online ? 'Offline' : x.level === 'CRITICAL' || x.level === 'ALERT' ? 'Tamper alert' : x.door === 'open' ? 'Open' : x.state === 'locked' ? 'Locked' : 'Unlocked';
+    return `<div class="card locker ${esc(lv)}"><h2>${esc(x.id)}</h2><div class="big">${state}</div>
+      <div class="meta">Door ${esc(x.door)} · status <span class="tag ${esc(x.level)}">${esc(x.level)}</span></div>
+      <div class="meta">Last seen ${new Date(x.last_seen*1000).toLocaleTimeString()}</div>
+      <button class="act" ${x.online ? '' : 'disabled'} data-unlock="${esc(x.id)}">Unlock remotely</button></div>`;
+  }).join('');
+  document.querySelectorAll('[data-unlock]').forEach(b => b.onclick = async () => {
+    if (confirm('Unlock ' + b.dataset.unlock + '?')) { await post('/api/unlock/' + b.dataset.unlock, 'POST'); b.textContent = 'Unlock sent'; }
+  });
+}
+async function loadEvents() {
+  const q = $('#q').value;
+  $('#csv').href = '/api/export.csv?q=' + encodeURIComponent(q);
+  const ev = await api('/api/events?limit=200&q=' + encodeURIComponent(q));
+  $('#evBody').innerHTML = ev.map(e => `<tr><td>${new Date(e.ts*1000).toLocaleString()}</td><td>${esc(e.locker)}</td><td>${esc(e.type)}</td><td>${esc(e.user)}</td><td>${esc(e.result)}</td><td>${esc(e.detail)}</td><td><span class="tag ${esc(e.level)}">${esc(e.level)}</span></td></tr>`).join('')
+    || '<tr><td colspan="7">No events match.</td></tr>';
+}
+async function loadUsers() {
+  const u = await api('/api/users');
+  $('#uBody').innerHTML = u.map(x => `<tr><td>${esc(x.name)}</td><td>${esc(x.card) || '-'}</td><td>${x.has_pin ? 'set' : '-'}</td><td>${x.anytime ? 'Any hour' : 'Allowed hours'}</td>
+    <td>${x.active ? 'Active' : 'Revoked'}</td>
+    <td><button class="act sec" style="margin:0" data-tog="${x.id}" data-a="${x.active ? 0 : 1}">${x.active ? 'Revoke' : 'Restore'}</button>
+    <button class="act danger" style="margin:0" data-del="${x.id}">Delete</button></td></tr>`).join('') || '<tr><td colspan="6">No users yet. Add one above.</td></tr>';
+  document.querySelectorAll('[data-tog]').forEach(b => b.onclick = async () => { await post('/api/users/' + b.dataset.tog, 'PATCH', {active: +b.dataset.a}); loadUsers(); });
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = async () => { if (confirm('Delete this user?')) { await post('/api/users/' + b.dataset.del, 'DELETE'); loadUsers(); } });
+}
+function bars(id, lid, labels, vals) {
+  const max = Math.max(1, ...vals);
+  $(id).innerHTML = vals.map((v, i) => `<div style="height:${v/max*100}%" title="${labels[i]}: ${v}"></div>`).join('');
+  $(lid).innerHTML = labels.map(l => `<span>${l}</span>`).join('');
+}
+async function loadCharts() {
+  const s = await api('/api/stats');
+  bars('#hrBar', '#hrLbl', [...Array(24).keys()].map(h => h % 3 ? '' : h), s.hours);
+  const days = Object.keys(s.failedByDay).sort();
+  bars('#dayBar', '#dayLbl', days.map(d => d.slice(5)), days.map(d => s.failedByDay[d]));
+}
+$('#addUser').onclick = async () => {
+  const r = await post('/api/users', 'POST', {name: $('#uName').value.trim(), card: $('#uCard').value.trim(), pin: $('#uPin').value.trim(), anytime: $('#uAny').checked});
+  if (r.error) return alert(r.error);
+  ['#uName', '#uCard', '#uPin'].forEach(i => $(i).value = ''); loadUsers();
+};
+$('#q').oninput = loadEvents;
+function refresh() {
+  const t = document.querySelector('main section.on').id;
+  ({lockers: loadLockers, activity: loadEvents, users: loadUsers, charts: loadCharts})[t]();
+}
+refresh(); setInterval(() => { const t = document.querySelector('main section.on').id; if (t === 'lockers' || (t === 'activity' && !$('#q').value)) refresh(); }, 3000);
+</script>
+</body>
+</html>
