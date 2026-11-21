@@ -136,7 +136,7 @@ app.get('/api/export.csv', (req, res) => {
   res.set({ 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename=keepsafe-access-log.csv' }).send(csv);
 });
 
-app.get('/api/users', (req, res) => res.json(db.prepare('SELECT id,name,card,anytime,active, (pin IS NOT NULL AND pin!="") AS has_pin FROM users').all()));
+app.get('/api/users', (req, res) => res.json(db.prepare('SELECT id,name,card,anytime,active, (LENGTH(pin) > 0) AS has_pin FROM users').all()));
 app.post('/api/users', (req, res) => {
   const { name, card, pin, anytime } = req.body || {};
   if (!name || (!card && !pin)) return res.status(400).json({ error: 'name and a card or PIN required' });

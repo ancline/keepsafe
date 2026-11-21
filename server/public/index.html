@@ -150,7 +150,7 @@ function refresh() {
   const t = document.querySelector('main section.on').id;
   ({lockers: loadLockers, activity: loadEvents, users: loadUsers, charts: loadCharts})[t]();
 }
-refresh(); setInterval(() => { const t = document.querySelector('main section.on').id; if (t === 'lockers' || (t === 'activity' && !$('#q').value)) refresh(); }, 3000);
+refresh(); setInterval(() => { const t = document.querySelector('main section.on').id; if (t === 'lockers' || (t === 'activity' && !$('#q').value)) refresh(); }, 1500);
 </script>
 </body>
 </html>
